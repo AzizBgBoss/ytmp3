@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ytmp3</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;800&display=swap');
+
+:root {
+  --bg:     #0a0a0f;
+  --panel:  #0f0f1a;
+  --border: #1a1a2e;
+  --accent: #00ff88;
+  --warn:   #ff6b35;
+  --text:   #c8d8c8;
+  --dim:    #4a5a4a;
+  --glow:   0 0 14px rgba(0,255,136,0.3);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  min-height: 100vh;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 36px 14px 60px;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,255,136,0.025) 39px, rgba(0,255,136,0.025) 40px),
+    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,255,136,0.015) 39px, rgba(0,255,136,0.015) 40px);
+}
+.logo { font-family:'Orbitron',sans-serif; font-weight:800; font-size:2.4rem; letter-spacing:.1em; color:var(--accent); text-shadow:var(--glow); margin-bottom:4px; }
+.logo span { color:var(--warn); }
+.tagline { font-size:.7rem; color:var(--dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:28px; }
+.card { width:100%; max-width:580px; background:var(--panel); border:1px solid var(--border); box-shadow:0 0 40px rgba(0,0,0,.7); margin-bottom:20px; overflow:hidden; }
+.tabs { display:-webkit-box; display:-webkit-flex; display:flex; border-bottom:1px solid var(--border); }
+.tab { -webkit-box-flex:1; -webkit-flex:1; flex:1; padding:11px 8px; font-family:'Orbitron',sans-serif; font-size:.6rem; letter-spacing:.15em; color:var(--dim); cursor:pointer; background:transparent; border:none; text-transform:uppercase; border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.pane { display:none; padding:20px; }
+.pane.active { display:block; }
+label { display:block; font-size:.67rem; letter-spacing:.15em; color:var(--dim); text-transform:uppercase; margin-bottom:7px; }
+.row { display:-webkit-box; display:-webkit-flex; display:flex; gap:8px; }
+input[type=text] { -webkit-box-flex:1; -webkit-flex:1; flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'Share Tech Mono',monospace; font-size:.83rem; padding:9px 11px; outline:none; }
+input[type=text]:focus { border-color:var(--accent); }
+.btn { background:transparent; border:1px solid var(--accent); color:var(--accent); font-family:'Orbitron',sans-serif; font-size:.6rem; letter-spacing:.12em; padding:9px 14px; cursor:pointer; text-transform:uppercase; white-space:nowrap; }
+.btn:disabled { opacity:.4; cursor:default; }
+#spin { display:none; text-align:center; color:var(--dim); font-size:.75rem; padding:14px 0; }
+#results { margin-top:12px; }
+.result { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; }
+.result:last-child { border-bottom:none; }
+.thumb { width:70px; height:39px; object-fit:cover; border:1px solid var(--border); -webkit-flex-shrink:0; flex-shrink:0; }
+.rinfo { -webkit-box-flex:1; -webkit-flex:1; flex:1; overflow:hidden; }
+.rtitle { font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+.rmeta  { font-size:.64rem; color:var(--dim); }
+.rget   { font-family:'Orbitron',sans-serif; font-size:.57rem; color:var(--accent); border:1px solid var(--border); padding:4px 8px; -webkit-flex-shrink:0; flex-shrink:0; }
+.serr   { color:var(--warn); font-size:.78rem; padding:10px 0; }
+#active-wrap { width:100%; max-width:580px; margin-bottom:20px; display:none; }
+.sec-hdr { font-size:.64rem; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--border); padding-bottom:6px; }
+.job { background:var(--panel); border:1px solid var(--border); border-top:none; padding:11px 14px; }
+.job:first-child { border-top:1px solid var(--border); }
+.jtop { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; -webkit-box-align:baseline; -webkit-align-items:baseline; align-items:baseline; gap:10px; margin-bottom:5px; }
+.jtitle { font-size:.77rem; -webkit-box-flex:1; -webkit-flex:1; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.jstat  { font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); -webkit-flex-shrink:0; flex-shrink:0; }
+.jstat.downloading { color:var(--accent); }
+.jstat.done        { color:var(--accent); }
+.jstat.converting  { color:#ffe066; }
+.jstat.error       { color:var(--warn); }
+.bwrap { height:3px; background:var(--border); overflow:hidden; margin-bottom:5px; }
+.bfill { height:100%; width:0; background:var(--accent); -webkit-transition:width .35s; transition:width .35s; }
+.bfill.ind { width:100% !important; opacity:.45; }
+.bfill.err { background:var(--warn); width:100% !important; }
+.jmeta { font-size:.65rem; color:var(--dim); }
+.jdl   { color:var(--accent); text-decoration:none; font-size:.65rem; }
+.jerr  { color:var(--warn); }
+#hist-wrap { width:100%; max-width:580px; }
+.hist { background:var(--panel); border:1px solid var(--border); border-top:none; padding:9px 14px; display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; gap:10px; }
+.hist:first-child { border-top:1px solid var(--border); }
+.htitle { -webkit-box-flex:1; -webkit-flex:1; flex:1; font-size:.77rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hmeta  { font-size:.63rem; color:var(--dim); -webkit-flex-shrink:0; flex-shrink:0; }
+.hdl    { color:var(--accent); text-decoration:none; font-size:.67rem; -webkit-flex-shrink:0; flex-shrink:0; }
+.hdel   { background:none; border:none; color:var(--dim); cursor:pointer; font-size:.7rem; padding:2px 4px; -webkit-flex-shrink:0; flex-shrink:0; }
+.empty  { background:var(--panel); border:1px solid var(--border); padding:12px 14px; font-size:.75rem; color:var(--dim); }
+</style>
+</head>
+<body>
+
+<div class="logo">yt<span>mp3</span></div>
+<div class="tagline">search &middot; download &middot; collect</div>
+
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" onclick="showPane('search')">&#128269; Search</button>
+    <button class="tab"        onclick="showPane('url')">&#128279; URL</button>
+  </div>
+  <div class="pane active" id="pane-search">
+    <label>search youtube</label>
+    <div class="row">
+      <input id="q" type="text" placeholder="artist, song...">
+      <button class="btn" id="sbtn" onclick="doSearch()">Search</button>
+    </div>
+    <div id="spin">[ searching... ]</div>
+    <div id="results"></div>
+  </div>
+  <div class="pane" id="pane-url">
+    <label>youtube url</label>
+    <div class="row">
+      <input id="url" type="text" placeholder="https://youtube.com/watch?v=...">
+      <button class="btn" onclick="queueUrl()">GET</button>
+    </div>
+  </div>
+</div>
+
+<div id="active-wrap">
+  <div class="sec-hdr">active downloads</div>
+  <div id="active-list"></div>
+</div>
+
+<div id="hist-wrap">
+  <div class="sec-hdr">library</div>
+  <div id="hist-list"><div class="empty">no downloads yet</div></div>
+</div>
+
+<script>
+/* XHR wrapper — no fetch, no Promises, no arrow functions, no const/let */
+function xhr(method, url, body, cb) {
+  var req = new XMLHttpRequest();
+  req.open(method, url, true);
+  if (body !== null) req.setRequestHeader('Content-Type', 'application/json');
+  req.onreadystatechange = function() {
+    if (req.readyState !== 4) return;
+    var d = null;
+    try { d = JSON.parse(req.responseText); } catch(e) {}
+    cb(req.status, d);
+  };
+  req.send(body !== null ? JSON.stringify(body) : null);
+}
+
+/* Tabs */
+function showPane(name) {
+  var panes = ['search','url'];
+  var i;
+  for (i = 0; i < panes.length; i++) {
+    document.getElementById('pane-' + panes[i]).className = 'pane' + (panes[i] === name ? ' active' : '');
+    document.querySelectorAll('.tab')[i].className = 'tab' + (panes[i] === name ? ' active' : '');
+  }
+}
+
+/* Search */
+function doSearch() {
+  var q = document.getElementById('q').value;
+  if (!q) return;
+  document.getElementById('sbtn').disabled = true;
+  document.getElementById('spin').style.display = 'block';
+  document.getElementById('results').innerHTML = '';
+  xhr('POST', '/search', {q: q}, function(status, d) {
+    document.getElementById('spin').style.display = 'none';
+    document.getElementById('sbtn').disabled = false;
+    if (!d || d.error) {
+      document.getElementById('results').innerHTML = '<div class="serr">' + esc(d ? d.error : 'request failed') + '</div>';
+      return;
+    }
+    if (!d.results || !d.results.length) {
+      document.getElementById('results').innerHTML = '<div class="serr">no results</div>';
+      return;
+    }
+    var html = '', i, r;
+    for (i = 0; i < d.results.length; i++) {
+      r = d.results[i];
+      html += '<div class="result" onclick="queue(\'' + ea(r.url) + '\')">' +
+        '<img class="thumb" src="' + ea(r.thumb) + '" onerror="this.style.display=\'none\'">' +
+        '<div class="rinfo"><div class="rtitle">' + esc(r.title) + '</div>' +
+        '<div class="rmeta">' + esc(r.channel) + ' &middot; ' + esc(r.duration) + '</div></div>' +
+        '<span class="rget">&#8595; GET</span></div>';
+    }
+    document.getElementById('results').innerHTML = html;
+  });
+}
+
+/* Queue */
+function queueUrl() {
+  var url = document.getElementById('url').value;
+  if (url) queue(url);
+}
+
+function queue(url) {
+  xhr('POST', '/start', {url: url}, function(status, d) {
+    if (d && d.job_id) {
+      document.getElementById('active-wrap').style.display = '';
+      trackJob(d.job_id);
+    }
+  });
+}
+
+/* Job tracking */
+var tracked = {};
+
+function trackJob(id) {
+  if (tracked[id]) return;
+  tracked[id] = true;
+  renderJob(id, {status:'queued', title:'...', progress:'0%', speed:'', eta:'', error:''});
+  pollJob(id);
+}
+
+function pollJob(id) {
+  xhr('GET', '/status/' + id, null, function(status, d) {
+    if (!d) { setTimeout(function() { pollJob(id); }, 1500); return; }
+    renderJob(id, d);
+    if (d.status !== 'done' && d.status !== 'error') {
+      setTimeout(function() { pollJob(id); }, 1000);
+    } else {
+      if (d.status === 'done') loadHistory();
+      setTimeout(function() {
+        var el = document.getElementById('job-' + id);
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        delete tracked[id];
+        var list = document.getElementById('active-list');
+        if (list && !list.firstChild) {
+          document.getElementById('active-wrap').style.display = 'none';
+        }
+      }, 8000);
+    }
+  });
+}
+
+function renderJob(id, d) {
+  var pct    = parseFloat(d.progress) || 0;
+  var isDone = d.status === 'done';
+  var isErr  = d.status === 'error';
+  var isInd  = (d.status === 'queued' || d.status === 'starting' || d.status === 'converting');
+  var barCls = 'bfill' + (isErr ? ' err' : (isInd ? ' ind' : ''));
+  var barW   = (isInd || isErr) ? 100 : pct;
+  var meta   = '';
+  if (isDone && d.filename) {
+    meta = '<a class="jdl" href="/dl/' + encodeURIComponent(d.filename) + '" download>&#8595; save mp3</a>';
+  } else if (isErr) {
+    meta = '<span class="jerr">' + esc(d.error) + '</span>';
+  } else {
+    meta = esc(d.speed || '') + (d.eta ? '  ETA ' + esc(d.eta) : '');
+  }
+  var html =
+    '<div class="job" id="job-' + id + '">' +
+    '<div class="jtop"><span class="jtitle">' + esc(d.title || '...') + '</span>' +
+    '<span class="jstat ' + d.status + '">' + d.status + '</span></div>' +
+    '<div class="bwrap"><div class="' + barCls + '" style="width:' + barW + '%"></div></div>' +
+    '<div class="jmeta">' + meta + '</div></div>';
+  var existing = document.getElementById('job-' + id);
+  if (existing) {
+    existing.outerHTML = html;
+  } else {
+    document.getElementById('active-list').innerHTML += html;
+  }
+}
+
+/* History */
+function loadHistory() {
+  xhr('GET', '/history', null, function(status, items) {
+    var el = document.getElementById('hist-list');
+    if (!items || !items.length) {
+      el.innerHTML = '<div class="empty">no downloads yet</div>';
+      return;
+    }
+    var html = '', i, h, mb;
+    for (i = 0; i < items.length; i++) {
+      h = items[i];
+      mb = h.size ? (h.size / 1048576).toFixed(1) + ' MB' : '';
+      html += '<div class="hist">' +
+        '<span class="htitle">' + esc(h.title || h.filename) + '</span>' +
+        '<span class="hmeta">' + esc(h.date || '') + (mb ? ' &middot; ' + mb : '') + '</span>' +
+        '<a class="hdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>&#8595; dl</a>' +
+        '<button class="hdel" onclick="delFile(\'' + ea(h.filename) + '\')">&#10005;</button>' +
+        '</div>';
+    }
+    el.innerHTML = html;
+  });
+}
+
+function delFile(filename) {
+  if (!confirm('Delete ' + filename + '?')) return;
+  xhr('DELETE', '/delete/' + encodeURIComponent(filename), null, function() {
+    loadHistory();
+  });
+}
+
+/* Utils */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function ea(s) {
+  return String(s).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+}
+
+/* Init */
+loadHistory();
+document.getElementById('q').onkeydown   = function(e) { if ((e || window.event).keyCode === 13) doSearch(); };
+document.getElementById('url').onkeydown = function(e) { if ((e || window.event).keyCode === 13) queueUrl(); };
+</script>
+</body>
+</html>
