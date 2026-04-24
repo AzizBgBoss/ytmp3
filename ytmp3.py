@@ -85,18 +85,16 @@ def fmt_duration(secs):
     h, m = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-def strip_ansi(text):
-    """Remove ANSI escape codes from text"""
-    return re.sub(r'\x1b\[[0-9;]*m', '', str(text))
-
 # ── Download workers ─────────────────────────────────────────────────────────
 def make_hook(job):
     class Hook:
         def __call__(self, d):
             if d["status"] == "downloading":
-                job["progress"] = strip_ansi(d.get("_percent_str", "?%")).strip()
-                job["speed"]    = strip_ansi(d.get("_speed_str", "")).strip()
-                job["eta"]      = strip_ansi(d.get("_eta_str", "")).strip()
+                # Extract numeric percentage from yt-dlp data
+                pct = d.get("_percent_float", 0)
+                job["progress"] = f"{pct:.1f}%"
+                job["speed"]    = d.get("_speed_str", "").strip()
+                job["eta"]      = d.get("_eta_str", "").strip()
                 job["status"]   = "downloading"
             elif d["status"] == "finished":
                 job["progress"] = "100%"
