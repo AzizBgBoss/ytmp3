@@ -5,142 +5,264 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ytmp3</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@500;800&display=swap');
+/* No CSS custom properties - hardcoded for BB WebKit compatibility */
+* { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-  --bg:     #0a0a0f;
-  --panel:  #0f0f1a;
-  --border: #1a1a2e;
-  --accent: #00ff88;
-  --warn:   #ff6b35;
-  --text:   #c8d8c8;
-  --dim:    #4a5a4a;
-  --glow:   0 0 14px rgba(0,255,136,0.3);
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  background: var(--bg); color: var(--text);
-  font-family: 'Share Tech Mono', monospace;
-  min-height: 100vh;
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
-  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  padding: 36px 14px 60px;
-  background-image:
-    repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(0,255,136,0.025) 39px, rgba(0,255,136,0.025) 40px),
-    repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(0,255,136,0.015) 39px, rgba(0,255,136,0.015) 40px);
+  background: #0a0a0f;
+  color: #c8d8c8;
+  font-family: monospace;
+  font-size: 14px;
+  padding: 20px 10px 50px;
+  text-align: center;
 }
-.logo { font-family:'Orbitron',sans-serif; font-weight:800; font-size:2.4rem; letter-spacing:.1em; color:var(--accent); text-shadow:var(--glow); margin-bottom:4px; }
-.logo span { color:var(--warn); }
-.tagline { font-size:.7rem; color:var(--dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:28px; }
-.card { width:100%; max-width:580px; background:var(--panel); border:1px solid var(--border); box-shadow:0 0 40px rgba(0,0,0,.7); margin-bottom:20px; overflow:hidden; }
-.tabs { display:-webkit-box; display:-webkit-flex; display:flex; border-bottom:1px solid var(--border); }
-.tab { -webkit-box-flex:1; -webkit-flex:1; flex:1; padding:11px 8px; font-family:'Orbitron',sans-serif; font-size:.6rem; letter-spacing:.15em; color:var(--dim); cursor:pointer; background:transparent; border:none; text-transform:uppercase; border-bottom:2px solid transparent; margin-bottom:-1px; }
-.tab.active { color:var(--accent); border-bottom-color:var(--accent); }
-.pane { display:none; padding:20px; }
-.pane.active { display:block; }
-label { display:block; font-size:.67rem; letter-spacing:.15em; color:var(--dim); text-transform:uppercase; margin-bottom:7px; }
-.row { display:-webkit-box; display:-webkit-flex; display:flex; gap:8px; }
-input[type=text] { -webkit-box-flex:1; -webkit-flex:1; flex:1; background:var(--bg); border:1px solid var(--border); color:var(--text); font-family:'Share Tech Mono',monospace; font-size:.83rem; padding:9px 11px; outline:none; }
-input[type=text]:focus { border-color:var(--accent); }
-.btn { background:transparent; border:1px solid var(--accent); color:var(--accent); font-family:'Orbitron',sans-serif; font-size:.6rem; letter-spacing:.12em; padding:9px 14px; cursor:pointer; text-transform:uppercase; white-space:nowrap; }
-.btn:disabled { opacity:.4; cursor:default; }
-.fmt-row { display:-webkit-box; display:-webkit-flex; display:flex; gap:6px; margin-bottom:14px; }
-.fmt-btn { -webkit-box-flex:1; -webkit-flex:1; flex:1; background:transparent; border:1px solid var(--border); color:var(--dim); font-family:'Orbitron',sans-serif; font-size:.58rem; letter-spacing:.12em; padding:7px 8px; cursor:pointer; text-transform:uppercase; }
-.fmt-btn.active { border-color:var(--accent); color:var(--accent); }
-.fmt-btn.mp4.active { border-color:#ffe066; color:#ffe066; }
-#spin { display:none; text-align:center; color:var(--dim); font-size:.75rem; padding:14px 0; }
-#results { margin-top:12px; }
-.result { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; }
-.result:last-child { border-bottom:none; }
-.thumb { width:70px; height:39px; object-fit:cover; border:1px solid var(--border); -webkit-flex-shrink:0; flex-shrink:0; }
-.rinfo { -webkit-box-flex:1; -webkit-flex:1; flex:1; overflow:hidden; }
-.rtitle { font-size:.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
-.rmeta  { font-size:.64rem; color:var(--dim); }
-.rget   { font-family:'Orbitron',sans-serif; font-size:.57rem; color:var(--accent); border:1px solid var(--border); padding:4px 8px; -webkit-flex-shrink:0; flex-shrink:0; }
-.serr   { color:var(--warn); font-size:.78rem; padding:10px 0; }
-#active-wrap { width:100%; max-width:580px; margin-bottom:20px; display:none; }
-.sec-hdr { font-size:.64rem; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--border); padding-bottom:6px; }
-.job { background:var(--panel); border:1px solid var(--border); border-top:none; padding:11px 14px; }
-.job:first-child { border-top:1px solid var(--border); }
-.jtop { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-pack:justify; -webkit-justify-content:space-between; justify-content:space-between; -webkit-box-align:baseline; -webkit-align-items:baseline; align-items:baseline; gap:10px; margin-bottom:5px; }
-.jtitle { font-size:.77rem; -webkit-box-flex:1; -webkit-flex:1; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.jstat  { font-size:.6rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); -webkit-flex-shrink:0; flex-shrink:0; }
-.jstat.downloading { color:var(--accent); }
-.jstat.done        { color:var(--accent); }
-.jstat.converting  { color:#ffe066; }
-.jstat.error       { color:var(--warn); }
-.bwrap { height:3px; background:var(--border); overflow:hidden; margin-bottom:5px; }
-.bfill { height:100%; width:0; background:var(--accent); -webkit-transition:width .35s; transition:width .35s; }
-.bfill.ind { width:100% !important; opacity:.45; }
-.bfill.err { background:var(--warn); width:100% !important; }
-.jmeta { font-size:.65rem; color:var(--dim); }
-.jdl   { color:var(--accent); text-decoration:none; font-size:.65rem; }
-.jerr  { color:var(--warn); }
-#hist-wrap { width:100%; max-width:580px; }
-.hist { background:var(--panel); border:1px solid var(--border); border-top:none; padding:9px 14px; display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; gap:10px; }
-.hist:first-child { border-top:1px solid var(--border); }
-.htitle { -webkit-box-flex:1; -webkit-flex:1; flex:1; font-size:.77rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.hmeta  { font-size:.63rem; color:var(--dim); -webkit-flex-shrink:0; flex-shrink:0; }
-.hdl    { color:var(--accent); text-decoration:none; font-size:.67rem; -webkit-flex-shrink:0; flex-shrink:0; }
-.hdel   { background:none; border:none; color:var(--dim); cursor:pointer; font-size:.7rem; padding:2px 4px; -webkit-flex-shrink:0; flex-shrink:0; }
-.empty  { background:var(--panel); border:1px solid var(--border); padding:12px 14px; font-size:.75rem; color:var(--dim); }
+
+h1 {
+  font-size: 2rem;
+  color: #00ff88;
+  letter-spacing: 4px;
+  margin-bottom: 4px;
+}
+h1 span { color: #ff6b35; }
+
+.sub {
+  font-size: 11px;
+  color: #4a5a4a;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: #0f0f1a;
+  border: 1px solid #1a1a2e;
+  text-align: left;
+  margin: 0 auto 16px;
+  max-width: 560px;
+  overflow: hidden;
+}
+
+/* Tabs */
+.tabs { display: -webkit-box; display: -webkit-flex; display: flex; border-bottom: 1px solid #1a1a2e; }
+.tab {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  padding: 10px 4px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #4a5a4a;
+  font-family: monospace;
+  font-size: 12px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: -1px;
+}
+.tab.on { color: #00ff88; border-bottom-color: #00ff88; }
+
+.pane { display: none; padding: 16px; }
+.pane.on { display: block; }
+
+/* Format toggle */
+.fmtrow { display: -webkit-box; display: -webkit-flex; display: flex; margin-bottom: 12px; }
+.fbtn {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  background: transparent;
+  border: 1px solid #1a1a2e;
+  color: #4a5a4a;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 7px 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.fbtn:first-child { margin-right: 6px; }
+.fbtn.on { border-color: #00ff88; color: #00ff88; }
+.fbtn.mp4.on { border-color: #ffe066; color: #ffe066; }
+
+lbl {
+  display: block;
+  font-size: 11px;
+  color: #4a5a4a;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+
+/* Input row */
+.irow { display: -webkit-box; display: -webkit-flex; display: flex; }
+input[type=text] {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  background: #0a0a0f;
+  border: 1px solid #1a1a2e;
+  border-right: none;
+  color: #c8d8c8;
+  font-family: monospace;
+  font-size: 13px;
+  padding: 9px 10px;
+  outline: none;
+}
+input[type=text]:focus { border-color: #00ff88; }
+
+.go {
+  background: transparent;
+  border: 1px solid #00ff88;
+  color: #00ff88;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 9px 14px;
+  cursor: pointer;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.go:disabled { opacity: 0.4; cursor: default; }
+
+/* Search results */
+.spin { display: none; color: #4a5a4a; font-size: 12px; padding: 12px 0; text-align: center; }
+#results { margin-top: 10px; }
+
+.res {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #1a1a2e;
+  cursor: pointer;
+}
+.res:last-child { border-bottom: none; }
+.thumb {
+  width: 68px; height: 38px;
+  object-fit: cover;
+  border: 1px solid #1a1a2e;
+  margin-right: 10px;
+  -webkit-flex-shrink: 0; flex-shrink: 0;
+}
+.rinfo { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; overflow: hidden; }
+.rtitle { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.rmeta  { font-size: 11px; color: #4a5a4a; }
+.rget   { font-size: 11px; color: #00ff88; border: 1px solid #1a1a2e; padding: 4px 8px; margin-left: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.serr   { color: #ff6b35; font-size: 12px; padding: 10px 0; }
+
+/* Section headers */
+.shdr {
+  font-size: 11px;
+  color: #4a5a4a;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #1a1a2e;
+  padding-bottom: 5px;
+  margin: 0 auto;
+  max-width: 560px;
+  text-align: left;
+}
+
+/* Active jobs */
+#awrap { margin-bottom: 14px; display: none; }
+.job {
+  background: #0f0f1a;
+  border: 1px solid #1a1a2e;
+  border-top: none;
+  padding: 10px 12px;
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: left;
+}
+.job:first-child { border-top: 1px solid #1a1a2e; }
+
+.jtop { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; margin-bottom: 5px; }
+.jtitle { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; margin-right: 8px; }
+.jst { font-size: 11px; color: #4a5a4a; text-transform: uppercase; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.jst.downloading { color: #00ff88; }
+.jst.converting  { color: #ffe066; }
+.jst.done        { color: #00ff88; }
+.jst.error       { color: #ff6b35; }
+
+.bwrap { height: 3px; background: #1a1a2e; overflow: hidden; margin-bottom: 5px; }
+.bfill { height: 100%; width: 0; background: #00ff88; }
+.bfill.ind { width: 60%; }
+.bfill.err { background: #ff6b35; width: 100%; }
+
+.jmeta { font-size: 11px; color: #4a5a4a; }
+.jdl { color: #00ff88; text-decoration: none; font-size: 12px; }
+.jerr { color: #ff6b35; }
+
+/* History */
+#hwrap { }
+.hist {
+  background: #0f0f1a;
+  border: 1px solid #1a1a2e;
+  border-top: none;
+  padding: 9px 12px;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: left;
+}
+.hist:first-child { border-top: 1px solid #1a1a2e; }
+.htitle { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+.hmeta  { font-size: 11px; color: #4a5a4a; margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.hdl    { color: #00ff88; text-decoration: none; font-size: 12px; margin-right: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.hdel   { background: none; border: none; color: #4a5a4a; cursor: pointer; font-size: 13px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.empty  { background: #0f0f1a; border: 1px solid #1a1a2e; padding: 12px; font-size: 12px; color: #4a5a4a; max-width: 560px; margin: 0 auto; text-align: left; }
 </style>
 </head>
 <body>
 
-<div class="logo">yt<span>mp3</span></div>
-<div class="tagline">search &middot; download &middot; collect</div>
+<h1>yt<span>mp3</span></h1>
+<div class="sub">search &middot; download &middot; collect</div>
 
 <div class="card">
   <div class="tabs">
-    <button class="tab active" onclick="showPane('search')">&#128269; Search</button>
-    <button class="tab"        onclick="showPane('url')">&#128279; URL</button>
+    <button class="tab on" onclick="showPane('s')">&#9835; Search</button>
+    <button class="tab"    onclick="showPane('u')">&#9654; URL</button>
   </div>
-  <div class="pane active" id="pane-search">
-    <div class="fmt-row">
-      <button class="fmt-btn active" id="fmt-mp3" onclick="setFmt('mp3')">&#9835; MP3</button>
-      <button class="fmt-btn mp4"    id="fmt-mp4" onclick="setFmt('mp4')">&#9654; MP4 (BB)</button>
+
+  <div class="pane on" id="ps">
+    <div class="fmtrow">
+      <button class="fbtn on"  id="fmp3" onclick="setFmt('mp3')">MP3 audio</button>
+      <button class="fbtn mp4" id="fmp4" onclick="setFmt('mp4')">MP4 video (BB)</button>
     </div>
-    <label>search youtube</label>
-    <div class="row">
+    <lbl>search youtube</lbl>
+    <div class="irow">
       <input id="q" type="text" placeholder="artist, song...">
-      <button class="btn" id="sbtn" onclick="doSearch()">Search</button>
+      <button class="go" id="sbtn" onclick="doSearch()">Search</button>
     </div>
-    <div id="spin">[ searching... ]</div>
+    <div class="spin" id="spin">[ searching... ]</div>
     <div id="results"></div>
   </div>
-  <div class="pane" id="pane-url">
-    <div class="fmt-row">
-      <button class="fmt-btn active" id="fmt-mp3-url" onclick="setFmt('mp3')">&#9835; MP3</button>
-      <button class="fmt-btn mp4"    id="fmt-mp4-url" onclick="setFmt('mp4')">&#9654; MP4 (BB)</button>
+
+  <div class="pane" id="pu">
+    <div class="fmtrow">
+      <button class="fbtn on"  id="fmp3u" onclick="setFmt('mp3')">MP3 audio</button>
+      <button class="fbtn mp4" id="fmp4u" onclick="setFmt('mp4')">MP4 video (BB)</button>
     </div>
-    <label>youtube url</label>
-    <div class="row">
+    <lbl>youtube url</lbl>
+    <div class="irow">
       <input id="url" type="text" placeholder="https://youtube.com/watch?v=...">
-      <button class="btn" onclick="queueUrl()">GET</button>
+      <button class="go" onclick="queueUrl()">GET</button>
     </div>
   </div>
 </div>
 
-<div id="active-wrap">
-  <div class="sec-hdr">active downloads</div>
-  <div id="active-list"></div>
+<div id="awrap">
+  <div class="shdr">active downloads</div>
+  <div id="alist"></div>
 </div>
 
-<div id="hist-wrap">
-  <div class="sec-hdr">library</div>
-  <div id="hist-list"><div class="empty">no downloads yet</div></div>
+<div id="hwrap">
+  <div class="shdr">library</div>
+  <div id="hlist"><div class="empty">no downloads yet</div></div>
 </div>
 
 <script>
-/* XHR wrapper — no fetch, no Promises, no arrow functions, no const/let */
+/* ES3-safe JS: var only, for loops, XMLHttpRequest, no arrow functions */
+
 function xhr(method, url, body, cb) {
   var req = new XMLHttpRequest();
   req.open(method, url, true);
-  if (body !== null) req.setRequestHeader('Content-Type', 'application/json');
+  if (body !== null) { req.setRequestHeader('Content-Type', 'application/json'); }
   req.onreadystatechange = function() {
-    if (req.readyState !== 4) return;
+    if (req.readyState !== 4) { return; }
     var d = null;
     try { d = JSON.parse(req.responseText); } catch(e) {}
     cb(req.status, d);
@@ -148,41 +270,44 @@ function xhr(method, url, body, cb) {
   req.send(body !== null ? JSON.stringify(body) : null);
 }
 
-/* Format toggle */
-var currentFmt = 'mp3';
-
-function setFmt(fmt) {
-  currentFmt = fmt;
-  var btns = document.querySelectorAll('.fmt-btn');
+/* Tabs */
+function showPane(id) {
+  var tabs  = document.querySelectorAll('.tab');
+  var panes = document.querySelectorAll('.pane');
+  var ids   = ['s', 'u'];
   var i;
-  for (i = 0; i < btns.length; i++) {
-    btns[i].className = 'fmt-btn' + (btns[i].id.indexOf('mp4') !== -1 ? ' mp4' : '') +
-      (btns[i].id.indexOf(fmt) !== -1 ? ' active' : '');
+  for (i = 0; i < ids.length; i++) {
+    tabs[i].className  = 'tab'  + (ids[i] === id ? ' on' : '');
+    panes[i].className = 'pane' + (ids[i] === id ? ' on' : '');
   }
 }
 
-/* Tabs */
-function showPane(name) {
-  var panes = ['search','url'];
-  var i;
-  for (i = 0; i < panes.length; i++) {
-    document.getElementById('pane-' + panes[i]).className = 'pane' + (panes[i] === name ? ' active' : '');
-    document.querySelectorAll('.tab')[i].className = 'tab' + (panes[i] === name ? ' active' : '');
+/* Format */
+var fmt = 'mp3';
+function setFmt(f) {
+  fmt = f;
+  var btns = document.querySelectorAll('.fbtn');
+  var i, el;
+  for (i = 0; i < btns.length; i++) {
+    el = btns[i];
+    var isMp4 = (el.id.indexOf('mp4') !== -1);
+    var isOn  = (isMp4 ? f === 'mp4' : f === 'mp3');
+    el.className = 'fbtn' + (isMp4 ? ' mp4' : '') + (isOn ? ' on' : '');
   }
 }
 
 /* Search */
 function doSearch() {
   var q = document.getElementById('q').value;
-  if (!q) return;
+  if (!q) { return; }
   document.getElementById('sbtn').disabled = true;
   document.getElementById('spin').style.display = 'block';
   document.getElementById('results').innerHTML = '';
-  xhr('POST', '/search', {q: q}, function(status, d) {
+  xhr('POST', '/search', {q: q}, function(s, d) {
     document.getElementById('spin').style.display = 'none';
     document.getElementById('sbtn').disabled = false;
     if (!d || d.error) {
-      document.getElementById('results').innerHTML = '<div class="serr">' + esc(d ? d.error : 'request failed') + '</div>';
+      document.getElementById('results').innerHTML = '<div class="serr">' + esc(d ? d.error : 'error') + '</div>';
       return;
     }
     if (!d.results || !d.results.length) {
@@ -192,11 +317,14 @@ function doSearch() {
     var html = '', i, r;
     for (i = 0; i < d.results.length; i++) {
       r = d.results[i];
-      html += '<div class="result" onclick="queue(\'' + ea(r.url) + '\')">' +
+      html += '<div class="res" onclick="queue(\'' + ea(r.url) + '\')">' +
         '<img class="thumb" src="' + ea(r.thumb) + '" onerror="this.style.display=\'none\'">' +
-        '<div class="rinfo"><div class="rtitle">' + esc(r.title) + '</div>' +
-        '<div class="rmeta">' + esc(r.channel) + ' &middot; ' + esc(r.duration) + '</div></div>' +
-        '<span class="rget">&#8595; GET</span></div>';
+        '<div class="rinfo">' +
+          '<div class="rtitle">' + esc(r.title) + '</div>' +
+          '<div class="rmeta">' + esc(r.channel) + ' &middot; ' + esc(r.duration) + '</div>' +
+        '</div>' +
+        '<span class="rget">GET</span>' +
+        '</div>';
     }
     document.getElementById('results').innerHTML = html;
   });
@@ -205,13 +333,13 @@ function doSearch() {
 /* Queue */
 function queueUrl() {
   var url = document.getElementById('url').value;
-  if (url) queue(url);
+  if (url) { queue(url); }
 }
 
 function queue(url) {
-  xhr('POST', '/start', {url: url, fmt: currentFmt}, function(status, d) {
+  xhr('POST', '/start', {url: url, fmt: fmt}, function(s, d) {
     if (d && d.job_id) {
-      document.getElementById('active-wrap').style.display = '';
+      document.getElementById('awrap').style.display = 'block';
       trackJob(d.job_id);
     }
   });
@@ -221,27 +349,26 @@ function queue(url) {
 var tracked = {};
 
 function trackJob(id) {
-  if (tracked[id]) return;
+  if (tracked[id]) { return; }
   tracked[id] = true;
-  renderJob(id, {status:'queued', title:'...', progress:'0%', speed:'', eta:'', error:''});
+  renderJob(id, {status: 'queued', title: '...', progress: 0, speed: '', eta: '', error: ''});
   pollJob(id);
 }
 
 function pollJob(id) {
-  xhr('GET', '/status/' + id, null, function(status, d) {
+  xhr('GET', '/status/' + id, null, function(s, d) {
     if (!d) { setTimeout(function() { pollJob(id); }, 1500); return; }
     renderJob(id, d);
     if (d.status !== 'done' && d.status !== 'error') {
       setTimeout(function() { pollJob(id); }, 1000);
     } else {
-      if (d.status === 'done') loadHistory();
+      if (d.status === 'done') { loadHistory(); }
       setTimeout(function() {
         var el = document.getElementById('job-' + id);
-        if (el && el.parentNode) el.parentNode.removeChild(el);
+        if (el && el.parentNode) { el.parentNode.removeChild(el); }
         delete tracked[id];
-        var list = document.getElementById('active-list');
-        if (list && !list.firstChild) {
-          document.getElementById('active-wrap').style.display = 'none';
+        if (!document.getElementById('alist').firstChild) {
+          document.getElementById('awrap').style.display = 'none';
         }
       }, 8000);
     }
@@ -249,51 +376,57 @@ function pollJob(id) {
 }
 
 function renderJob(id, d) {
-  var pct    = parseFloat(d.progress) || 0;
+  var pct    = d.progress || 0;
   var isDone = d.status === 'done';
   var isErr  = d.status === 'error';
-  var isInd  = (d.status === 'queued' || d.status === 'starting' || d.status === 'converting');
+  var isInd  = (d.status === 'queued' || d.status === 'starting');
   var barCls = 'bfill' + (isErr ? ' err' : (isInd ? ' ind' : ''));
-  var barW   = (isInd || isErr) ? 100 : pct;
+  var barW   = (isInd || isErr) ? '' : 'width:' + pct + '%;';
   var meta   = '';
   if (isDone && d.filename) {
-    meta = '<a class="jdl" href="/dl/' + encodeURIComponent(d.filename) + '" download>&#8595; save mp3</a>';
+    meta = '<a class="jdl" href="/dl/' + encodeURIComponent(d.filename) + '" download>SAVE ' + esc(d.fmt || '') + '</a>';
   } else if (isErr) {
     meta = '<span class="jerr">' + esc(d.error) + '</span>';
+  } else if (d.status === 'converting') {
+    meta = 'encoding for BB...';
   } else {
     meta = esc(d.speed || '') + (d.eta ? '  ETA ' + esc(d.eta) : '');
   }
+  var pctTxt = (!isInd && !isErr && !isDone) ? ' ' + pct + '%' : '';
   var html =
     '<div class="job" id="job-' + id + '">' +
-    '<div class="jtop"><span class="jtitle">' + esc(d.title || '...') + '</span>' +
-    '<span class="jstat ' + d.status + '">' + d.status + '</span></div>' +
-    '<div class="bwrap"><div class="' + barCls + '" style="width:' + barW + '%"></div></div>' +
-    '<div class="jmeta">' + meta + '</div></div>';
+    '<div class="jtop">' +
+      '<span class="jtitle">' + esc(d.title || '...') + '</span>' +
+      '<span class="jst ' + d.status + '">' + d.status + pctTxt + '</span>' +
+    '</div>' +
+    '<div class="bwrap"><div class="' + barCls + '" style="' + barW + '"></div></div>' +
+    '<div class="jmeta">' + meta + '</div>' +
+    '</div>';
   var existing = document.getElementById('job-' + id);
   if (existing) {
     existing.outerHTML = html;
   } else {
-    document.getElementById('active-list').innerHTML += html;
+    document.getElementById('alist').innerHTML += html;
   }
 }
 
 /* History */
 function loadHistory() {
-  xhr('GET', '/history', null, function(status, items) {
-    var el = document.getElementById('hist-list');
+  xhr('GET', '/history', null, function(s, items) {
+    var el = document.getElementById('hlist');
     if (!items || !items.length) {
       el.innerHTML = '<div class="empty">no downloads yet</div>';
       return;
     }
     var html = '', i, h, mb;
     for (i = 0; i < items.length; i++) {
-      h = items[i];
-      mb = h.size ? (h.size / 1048576).toFixed(1) + ' MB' : '';
+      h  = items[i];
+      mb = h.size ? (h.size / 1048576).toFixed(1) + 'MB' : '';
       html += '<div class="hist">' +
         '<span class="htitle">' + esc(h.title || h.filename) + '</span>' +
-        '<span class="hmeta">' + (h.fmt ? '['+h.fmt+'] ' : '') + esc(h.date || '') + (mb ? ' &middot; ' + mb : '') + '</span>' +
-        '<a class="hdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>&#8595; dl</a>' +
-        '<button class="hdel" onclick="delFile(\'' + ea(h.filename) + '\')">&#10005;</button>' +
+        '<span class="hmeta">[' + esc(h.fmt || '?') + '] ' + (mb ? mb + ' ' : '') + esc(h.date || '') + '</span>' +
+        '<a class="hdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>DL</a>' +
+        '<button class="hdel" onclick="delFile(\'' + ea(h.filename) + '\')">X</button>' +
         '</div>';
     }
     el.innerHTML = html;
@@ -301,24 +434,22 @@ function loadHistory() {
 }
 
 function delFile(filename) {
-  if (!confirm('Delete ' + filename + '?')) return;
-  xhr('DELETE', '/delete/' + encodeURIComponent(filename), null, function() {
-    loadHistory();
-  });
+  if (!confirm('Delete ' + filename + '?')) { return; }
+  xhr('DELETE', '/delete/' + encodeURIComponent(filename), null, function() { loadHistory(); });
 }
 
 /* Utils */
 function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function ea(s) {
-  return String(s).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+  return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 }
 
 /* Init */
 loadHistory();
-document.getElementById('q').onkeydown   = function(e) { if ((e || window.event).keyCode === 13) doSearch(); };
-document.getElementById('url').onkeydown = function(e) { if ((e || window.event).keyCode === 13) queueUrl(); };
+document.getElementById('q').onkeydown   = function(e) { if ((e || window.event).keyCode === 13) { doSearch(); } };
+document.getElementById('url').onkeydown = function(e) { if ((e || window.event).keyCode === 13) { queueUrl(); } };
 </script>
 </body>
 </html>
