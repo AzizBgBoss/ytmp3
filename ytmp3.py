@@ -151,10 +151,10 @@ def download_mp3(job_id, url):
 
 def download_mp4(job_id, url):
     job = jobs[job_id]
-    # Download raw video first (best quality), then re-encode for BB
+    # Download video ≤480p + audio (skip high-res, we re-encode to 480×360 anyway)
     raw_tmpl = str(DOWNLOADS_DIR / "%(title)s.%(ext)s")
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "format": "best[ext=mp4][height<=480]+bestaudio[ext=m4a]/best[height<=480]+bestaudio/best",
         "outtmpl": raw_tmpl,
         "merge_output_format": "mp4",
         "progress_hooks": [make_hook(job)],
