@@ -94,12 +94,14 @@ def make_hook(job):
     class Hook:
         def __call__(self, d):
             if d["status"] == "downloading":
-                job["progress"] = strip_ansi(d.get("_percent_str", "?%")).strip()
+                # Extract just the number from percent_str (e.g., "5.63%" -> "5.63")
+                percent_str = strip_ansi(d.get("_percent_str", "?%")).strip()
+                job["progress"] = percent_str.rstrip('%')
                 job["speed"]    = strip_ansi(d.get("_speed_str", "")).strip()
                 job["eta"]      = strip_ansi(d.get("_eta_str", "")).strip()
                 job["status"]   = "downloading"
             elif d["status"] == "finished":
-                job["progress"] = "100%"
+                job["progress"] = "100"
                 job["status"]   = "converting"
     return Hook()
 
