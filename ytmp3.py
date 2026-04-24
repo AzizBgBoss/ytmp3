@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
-ytmp3.py — YouTube → MP3 downloader with LAN web UI
-Run: python ytmp3.py
+ytmp3.py — YouTube → MP3/MP4 downloader with LAN web UI
+Run: python ytmp3.py  (or python3 ytmp3.py on Linux)
 Access from BB browser: http://<your-PC-LAN-IP>:5555
 
-Requires: pip install yt-dlp flask
-Requires: ffmpeg in PATH  (winget install ffmpeg)
-          OR set FFMPEG_PATH below to your ffmpeg.exe location
+Requires: pip install yt-dlp flask --break-system-packages
+Requires: ffmpeg in PATH
 """
 
-import os, re, threading, time, json, shutil
+import os, re, threading, time, json, shutil, subprocess
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, send_file
 
@@ -86,10 +85,8 @@ def fmt_duration(secs):
     h, m = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
-# ── Download worker ─────────────────────────────────────────────────────────
-def download_job(job_id, url):
-    job = jobs[job_id]
-
+# ── Download workers ─────────────────────────────────────────────────────────
+def make_hook(job):
     class Hook:
         def __call__(self, d):
             if d["status"] == "downloading":
@@ -100,16 +97,25 @@ def download_job(job_id, url):
             elif d["status"] == "finished":
                 job["progress"] = "100%"
                 job["status"]   = "converting"
+    return Hook()
 
+def download_job(job_id, url, fmt):
+    if fmt == "mp4":
+        download_mp4(job_id, url)
+    else:
+        download_mp3(job_id, url)
+
+def download_mp3(job_id, url):
+    job = jobs[job_id]
     ydl_opts = {
-        "format": "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio",
+        "format": "bestaudio/best",
         "outtmpl": str(DOWNLOADS_DIR / "%(title)s.%(ext)s"),
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
             "preferredquality": "192",
         }],
-        "progress_hooks": [Hook()],
+        "progress_hooks": [make_hook(job)],
         "quiet": True,
         "no_warnings": True,
     }
@@ -120,68 +126,92 @@ def download_job(job_id, url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info  = ydl.extract_info(url, download=False)
             title = info.get("title", "unknown")
-            expected_duration = info.get("duration", 0)
             job["title"]  = title
-            job["expected_duration"] = fmt_duration(expected_duration)
             job["status"] = "starting"
-            
-            # Log selected audio format
-            formats = info.get("formats", [])
-            audio_formats = [f for f in formats if f.get("vcodec") == "none"]
-            if audio_formats:
-                selected = audio_formats[0]
-                job["audio_format"] = f"{selected.get('format_id')}: {selected.get('ext')} @ {selected.get('abr', '?')}kbps"
-            
             ydl.download([url])
 
-        # Find the resulting mp3
         safe = sanitize(title)
-        mp3  = DOWNLOADS_DIR / f"{safe}.mp3"
-        if not mp3.exists():
+        out  = DOWNLOADS_DIR / f"{safe}.mp3"
+        if not out.exists():
             candidates = sorted(DOWNLOADS_DIR.glob("*.mp3"), key=os.path.getmtime, reverse=True)
-            mp3 = candidates[0] if candidates else None
+            out = candidates[0] if candidates else None
 
-        if mp3 and mp3.exists():
-            job["filename"] = mp3.name
+        if out and out.exists():
+            job["filename"] = out.name
             job["status"]   = "done"
             job["progress"] = "100%"
-            
-            # Get actual MP3 duration via ffprobe
-            try:
-                import subprocess
-                ffprobe_cmd = "ffprobe"
-                if FFMPEG_LOCATION:
-                    ffprobe_path = Path(FFMPEG_LOCATION) / "ffprobe.exe"
-                    if ffprobe_path.exists():
-                        ffprobe_cmd = str(ffprobe_path)
-                
-                result = subprocess.run(
-                    [ffprobe_cmd, "-v", "error", "-show_entries", "format=duration",
-                     "-of", "default=noprint_wrappers=1:nokey=1:noprint_wrappers=1",
-                     str(mp3)],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.stdout:
-                    actual_duration = float(result.stdout.strip())
-                    job["actual_duration"] = fmt_duration(actual_duration)
-                    expected = info.get("duration", 0)
-                    diff = abs(actual_duration - expected)
-                    # Warn if >5% different
-                    if expected > 0 and diff / expected > 0.05:
-                        job["duration_warning"] = f"Expected {fmt_duration(expected)}, got {fmt_duration(actual_duration)} ({diff:+.0f}s)"
-            except Exception as e:
-                job["duration_check"] = f"Could not verify: {str(e)}"
-            
-            save_entry({
-                "filename": mp3.name,
-                "title":    title,
-                "date":     time.strftime("%Y-%m-%d %H:%M"),
-                "size":     mp3.stat().st_size,
-                "expected_duration": fmt_duration(expected_duration),
-                "actual_duration": job.get("actual_duration", "?"),
-            })
+            save_entry({"filename": out.name, "title": title, "fmt": "mp3",
+                        "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
         else:
             raise FileNotFoundError("MP3 not found after conversion")
+
+    except Exception as e:
+        job["status"] = "error"
+        job["error"]  = str(e)
+
+def download_mp4(job_id, url):
+    job = jobs[job_id]
+    # Download raw video first (best quality), then re-encode for BB
+    raw_tmpl = str(DOWNLOADS_DIR / "%(title)s.%(ext)s")
+    ydl_opts = {
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best",
+        "outtmpl": raw_tmpl,
+        "merge_output_format": "mp4",
+        "progress_hooks": [make_hook(job)],
+        "quiet": True,
+        "no_warnings": True,
+    }
+    if FFMPEG_LOCATION:
+        ydl_opts["ffmpeg_location"] = FFMPEG_LOCATION
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info  = ydl.extract_info(url, download=False)
+            title = info.get("title", "unknown")
+            job["title"]  = title
+            job["status"] = "starting"
+            ydl.download([url])
+
+        # Find the raw downloaded file
+        safe = sanitize(title)
+        raw  = DOWNLOADS_DIR / f"{safe}.mp4"
+        if not raw.exists():
+            candidates = sorted(DOWNLOADS_DIR.glob("*.mp4"), key=os.path.getmtime, reverse=True)
+            raw = candidates[0] if candidates else None
+
+        if not raw or not raw.exists():
+            raise FileNotFoundError("Downloaded video not found")
+
+        # Re-encode with BB-compatible settings (from bbvideo.sh)
+        job["status"]   = "converting"
+        job["progress"] = "100%"
+        out = DOWNLOADS_DIR / f"{safe}_bb.mp4"
+
+        ffmpeg_bin = "ffmpeg"
+        if FFMPEG_LOCATION:
+            ffmpeg_bin = str(Path(FFMPEG_LOCATION) / "ffmpeg")
+
+        cmd = [
+            ffmpeg_bin, "-y", "-i", str(raw),
+            "-vf", "scale=480:360:force_original_aspect_ratio=decrease",
+            "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
+            "-preset", "fast", "-crf", "30",
+            "-c:a", "aac", "-b:a", "64k",
+            "-threads", "0",
+            str(out)
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg error: {result.stderr[-300:]}")
+
+        # Remove raw file if re-encode succeeded and it's different from output
+        if raw.resolve() != out.resolve() and raw.exists():
+            raw.unlink()
+
+        job["filename"] = out.name
+        job["status"]   = "done"
+        save_entry({"filename": out.name, "title": title, "fmt": "mp4",
+                    "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
 
     except Exception as e:
         job["status"] = "error"
@@ -218,13 +248,16 @@ def search():
 
 @app.route("/start", methods=["POST"])
 def start():
-    url = (request.get_json(force=True) or {}).get("url", "").strip()
+    body = request.get_json(force=True) or {}
+    url  = body.get("url", "").strip()
+    fmt  = body.get("fmt", "mp3").strip().lower()
+    fmt = fmt if fmt in ("mp3", "mp4") else "mp3"
     if not url:
         return jsonify({"error": "no url"}), 400
     job_id = str(int(time.time() * 1000))
     jobs[job_id] = {"status": "queued", "title": url[:60], "progress": "0%",
-                    "speed": "", "eta": "", "filename": "", "error": ""}
-    threading.Thread(target=download_job, args=(job_id, url), daemon=True).start()
+                    "speed": "", "eta": "", "filename": "", "error": "", "fmt": fmt}
+    threading.Thread(target=download_job, args=(job_id, url, fmt), daemon=True).start()
     return jsonify({"job_id": job_id})
 
 @app.route("/status/<job_id>")
@@ -241,7 +274,6 @@ def all_jobs():
 @app.route("/history")
 def history():
     h = load_history()
-    # Filter to files that still exist on disk
     h = [e for e in h if (DOWNLOADS_DIR / e["filename"]).exists()]
     return jsonify(h)
 

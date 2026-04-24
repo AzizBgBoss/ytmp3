@@ -45,6 +45,10 @@ input[type=text] { -webkit-box-flex:1; -webkit-flex:1; flex:1; background:var(--
 input[type=text]:focus { border-color:var(--accent); }
 .btn { background:transparent; border:1px solid var(--accent); color:var(--accent); font-family:'Orbitron',sans-serif; font-size:.6rem; letter-spacing:.12em; padding:9px 14px; cursor:pointer; text-transform:uppercase; white-space:nowrap; }
 .btn:disabled { opacity:.4; cursor:default; }
+.fmt-row { display:-webkit-box; display:-webkit-flex; display:flex; gap:6px; margin-bottom:14px; }
+.fmt-btn { -webkit-box-flex:1; -webkit-flex:1; flex:1; background:transparent; border:1px solid var(--border); color:var(--dim); font-family:'Orbitron',sans-serif; font-size:.58rem; letter-spacing:.12em; padding:7px 8px; cursor:pointer; text-transform:uppercase; }
+.fmt-btn.active { border-color:var(--accent); color:var(--accent); }
+.fmt-btn.mp4.active { border-color:#ffe066; color:#ffe066; }
 #spin { display:none; text-align:center; color:var(--dim); font-size:.75rem; padding:14px 0; }
 #results { margin-top:12px; }
 .result { display:-webkit-box; display:-webkit-flex; display:flex; -webkit-box-align:center; -webkit-align-items:center; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer; }
@@ -94,6 +98,10 @@ input[type=text]:focus { border-color:var(--accent); }
     <button class="tab"        onclick="showPane('url')">&#128279; URL</button>
   </div>
   <div class="pane active" id="pane-search">
+    <div class="fmt-row">
+      <button class="fmt-btn active" id="fmt-mp3" onclick="setFmt('mp3')">&#9835; MP3</button>
+      <button class="fmt-btn mp4"    id="fmt-mp4" onclick="setFmt('mp4')">&#9654; MP4 (BB)</button>
+    </div>
     <label>search youtube</label>
     <div class="row">
       <input id="q" type="text" placeholder="artist, song...">
@@ -103,6 +111,10 @@ input[type=text]:focus { border-color:var(--accent); }
     <div id="results"></div>
   </div>
   <div class="pane" id="pane-url">
+    <div class="fmt-row">
+      <button class="fmt-btn active" id="fmt-mp3-url" onclick="setFmt('mp3')">&#9835; MP3</button>
+      <button class="fmt-btn mp4"    id="fmt-mp4-url" onclick="setFmt('mp4')">&#9654; MP4 (BB)</button>
+    </div>
     <label>youtube url</label>
     <div class="row">
       <input id="url" type="text" placeholder="https://youtube.com/watch?v=...">
@@ -134,6 +146,19 @@ function xhr(method, url, body, cb) {
     cb(req.status, d);
   };
   req.send(body !== null ? JSON.stringify(body) : null);
+}
+
+/* Format toggle */
+var currentFmt = 'mp3';
+
+function setFmt(fmt) {
+  currentFmt = fmt;
+  var btns = document.querySelectorAll('.fmt-btn');
+  var i;
+  for (i = 0; i < btns.length; i++) {
+    btns[i].className = 'fmt-btn' + (btns[i].id.indexOf('mp4') !== -1 ? ' mp4' : '') +
+      (btns[i].id.indexOf(fmt) !== -1 ? ' active' : '');
+  }
 }
 
 /* Tabs */
@@ -184,7 +209,7 @@ function queueUrl() {
 }
 
 function queue(url) {
-  xhr('POST', '/start', {url: url}, function(status, d) {
+  xhr('POST', '/start', {url: url, fmt: currentFmt}, function(status, d) {
     if (d && d.job_id) {
       document.getElementById('active-wrap').style.display = '';
       trackJob(d.job_id);
@@ -266,7 +291,7 @@ function loadHistory() {
       mb = h.size ? (h.size / 1048576).toFixed(1) + ' MB' : '';
       html += '<div class="hist">' +
         '<span class="htitle">' + esc(h.title || h.filename) + '</span>' +
-        '<span class="hmeta">' + esc(h.date || '') + (mb ? ' &middot; ' + mb : '') + '</span>' +
+        '<span class="hmeta">' + (h.fmt ? '['+h.fmt+'] ' : '') + esc(h.date || '') + (mb ? ' &middot; ' + mb : '') + '</span>' +
         '<a class="hdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>&#8595; dl</a>' +
         '<button class="hdel" onclick="delFile(\'' + ea(h.filename) + '\')">&#10005;</button>' +
         '</div>';
