@@ -435,7 +435,7 @@ function loadHistory() {
 
 function delFile(filename) {
   if (!confirm('Delete ' + filename + '?')) { return; }
-  xhr('DELETE', '/delete/' + encodeURIComponent(filename), null, function() { loadHistory(); });
+  xhr('POST', '/delete/' + encodeURIComponent(filename), {}, function() { loadHistory(); });
 }
 
 /* Utils */

@@ -6,6 +6,13 @@ Access from BB browser: http://<your-PC-LAN-IP>:5555
 
 Requires: pip install yt-dlp flask --break-system-packages
 Requires: ffmpeg in PATH
+
+This converter is made mainly for old devices like my BlackBerry Bold 9700
+that can't stream YouTube directly but can play local MP3/MP4 files. It uses yt-dlp to
+download and convert videos, and serves a simple web UI for searching and managing downloads.
+The UI is intentionally minimal and mobile-friendly, with no external dependencies.
+
+Made by AzizBgBoss
 """
 
 import os, re, threading, time, json, shutil, subprocess
@@ -202,7 +209,7 @@ def download_mp4(job_id, url):
             "-vf", "scale=480:360:force_original_aspect_ratio=decrease",
             "-c:v", "libx264", "-profile:v", "baseline", "-level", "3.0",
             "-preset", "fast", "-crf", "30",
-            "-c:a", "aac", "-b:a", "64k",
+            "-c:a", "aac", "-b:a", "128k",
             "-threads", "0",
             str(out)
         ]
@@ -287,7 +294,7 @@ def history():
 def dl(filename):
     return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=True)
 
-@app.route("/delete/<filename>", methods=["DELETE"])
+@app.route("/delete/<filename>", methods=["POST", "DELETE"])
 def delete(filename):
     safe = os.path.basename(filename)
     path = DOWNLOADS_DIR / safe
