@@ -27,6 +27,9 @@ HISTORY_FILE  = Path("downloads_history.json")
 # Set to your ffmpeg.exe if not in PATH, e.g. r"C:\ffmpeg\bin\ffmpeg.exe"
 FFMPEG_PATH  = None
 
+# Number of search results to return (yt-dlp uses the `ytsearchN:` syntax)
+SEARCH_RESULTS = 20
+
 # ── Auto-detect ffmpeg on Windows ──────────────────────────────────────────
 def find_ffmpeg():
     if FFMPEG_PATH and Path(FFMPEG_PATH).exists():
@@ -244,7 +247,7 @@ def search():
     try:
         opts = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True}
         with yt_dlp.YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(f"ytsearch10:{q}", download=False)
+            info = ydl.extract_info(f"ytsearch{SEARCH_RESULTS}:{q}", download=False)
         results = []
         for e in (info.get("entries") or []):
             vid = e.get("id", "")
