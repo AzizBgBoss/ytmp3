@@ -247,21 +247,23 @@ input[type=text]:focus { border-color: #00ff88; }
 #feedlist {
   max-width: 560px;
   margin: 0 auto;
-  display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-flex-wrap: wrap; flex-wrap: wrap;
-  -webkit-box-align: stretch; -webkit-align-items: stretch; align-items: stretch;
+  font-size: 0;
+  text-align: left;
 }
 #feedlist .empty {
   width: 100%;
+  font-size: 12px;
 }
 .feeditem {
   background: #0f0f1a;
   border: 1px solid #1a1a2e;
   padding: 8px;
-  display: block;
+  display: inline-block;
+  vertical-align: top;
   width: 50%;
   min-height: 188px;
   text-align: left;
+  font-size: 14px;
 }
 .fthumb {
   display: block;
