@@ -440,7 +440,7 @@ function doSearch() {
     var html = '', i, r;
     for (i = 0; i < d.results.length; i++) {
       r = d.results[i];
-      html += '<div class="res" onclick="queue(\'' + ea(r.url) + '\')">' +
+      html += '<div class="res" onclick="queue(' + jsq(r.url) + ')">' +
         '<img class="thumb" src="' + ea(r.thumb) + '" onerror="this.style.display=\'none\'">' +
         '<div class="rinfo">' +
           '<div class="rtitle">' + esc(r.title) + '</div>' +
@@ -552,7 +552,7 @@ function loadHistory() {
         '<span class="hmeta">[' + esc(h.fmt || '?') + '] ' + (mb ? mb + ' ' : '') + esc(h.date || '') + '</span>' +
         '<a class="hopen" href="/open/' + encodeURIComponent(h.filename) + '">OPEN</a>' +
         '<a class="hdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>DL</a>' +
-        '<button class="hdel" id="del-' + i + '" onclick="delFile(\'' + ea(h.filename) + '\', this)">X</button>' +
+        '<button class="hdel" id="del-' + i + '" onclick="delFile(' + jsq(h.filename) + ', this)">X</button>' +
         '</div>';
     }
     el.innerHTML = html;
@@ -621,7 +621,18 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function ea(s) {
-  return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+  return String(s).replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+function jsq(s) {
+  return "'" + String(s)
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, '\\x27')
+    .replace(/"/g, '\\x22')
+    .replace(/&/g, '\\x26')
+    .replace(/</g, '\\x3c')
+    .replace(/>/g, '\\x3e')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n') + "'";
 }
 function fmtBytes(n) {
   n = Number(n || 0);
