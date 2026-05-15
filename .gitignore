@@ -1,1 +1,4 @@
 downloads*
+thumbs*
+__pycache__
+*.pyc

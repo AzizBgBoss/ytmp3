@@ -15,14 +15,15 @@ The UI is intentionally minimal and mobile-friendly, with no external dependenci
 Made by AzizBgBoss
 """
 
-import os, re, threading, time, json, shutil, subprocess
+import os, re, threading, time, json, shutil, subprocess, random, hashlib
 from pathlib import Path
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 
 # ── Config ─────────────────────────────────────────────────────────────────
 PORT         = 5555
 DOWNLOADS_DIR = Path("downloads")
 HISTORY_FILE  = Path("downloads_history.json")
+THUMBS_DIR    = Path("thumbs")
 
 # Set to your ffmpeg.exe if not in PATH, e.g. r"C:\ffmpeg\bin\ffmpeg.exe"
 FFMPEG_PATH  = None
@@ -60,6 +61,7 @@ except ImportError:
     exit(1)
 
 DOWNLOADS_DIR.mkdir(exist_ok=True)
+THUMBS_DIR.mkdir(exist_ok=True)
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 # In-memory active jobs  { job_id: { status, title, progress, filename, error } }
@@ -98,6 +100,89 @@ def fmt_duration(secs):
 def strip_ansi(text):
     """Remove ANSI escape codes from text"""
     return re.sub(r'\x1b\[[0-9;]*m', '', str(text))
+
+def file_url(filename, route="dl"):
+    return f"/{route}/{filename}"
+
+def thumb_name(filename, suffix=".jpg"):
+    key = hashlib.sha1(filename.encode("utf-8", "ignore")).hexdigest()
+    return THUMBS_DIR / f"{key}{suffix}"
+
+def ffmpeg_bin():
+    if FFMPEG_LOCATION:
+        return str(Path(FFMPEG_LOCATION) / "ffmpeg")
+    return "ffmpeg"
+
+def ffprobe_bin():
+    if FFMPEG_LOCATION:
+        return str(Path(FFMPEG_LOCATION) / "ffprobe")
+    return "ffprobe"
+
+def media_duration(path):
+    try:
+        result = subprocess.run(
+            [ffprobe_bin(), "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+            capture_output=True, text=True, timeout=8
+        )
+        if result.returncode == 0:
+            return max(1, int(float(result.stdout.strip() or "1")))
+    except Exception:
+        pass
+    return 12
+
+def make_video_thumb(path, filename):
+    out = thumb_name(filename)
+    if out.exists():
+        return out
+    duration = media_duration(path)
+    at = random.randint(1, max(1, min(duration - 1, duration)))
+    try:
+        result = subprocess.run(
+            [ffmpeg_bin(), "-y", "-ss", str(at), "-i", str(path),
+             "-frames:v", "1", "-vf", "scale=160:-1", str(out)],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0 and out.exists():
+            return out
+    except Exception:
+        pass
+    return None
+
+def make_audio_thumb(path, filename):
+    out = thumb_name(filename)
+    if out.exists():
+        return out
+    try:
+        result = subprocess.run(
+            [ffmpeg_bin(), "-y", "-i", str(path), "-map", "0:v:0",
+             "-frames:v", "1", "-vf", "scale=160:-1", str(out)],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode == 0 and out.exists():
+            return out
+    except Exception:
+        pass
+    return None
+
+def music_note_svg():
+    return """<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90" viewBox="0 0 160 90"><rect width="160" height="90" fill="#0f0f1a"/><path d="M91 18v39c0 9-8 15-18 15-8 0-14-4-14-10s6-10 14-10c3 0 6 1 8 2V26h33v11H91z" fill="#00ff88"/><rect x="1" y="1" width="158" height="88" fill="none" stroke="#1a1a2e" stroke-width="2"/></svg>"""
+
+def history_items():
+    h = load_history()
+    items = []
+    for e in h:
+        filename = os.path.basename(e.get("filename", ""))
+        path = DOWNLOADS_DIR / filename
+        if path.exists():
+            item = dict(e)
+            item["filename"] = filename
+            item["size"] = path.stat().st_size
+            item["open_url"] = file_url(filename, "open")
+            item["download_url"] = file_url(filename, "dl")
+            item["thumb"] = file_url(filename, "thumb")
+            items.append(item)
+    return items
 
 # ── Download workers ─────────────────────────────────────────────────────────
 def make_hook(job):
@@ -289,13 +374,46 @@ def all_jobs():
 
 @app.route("/history")
 def history():
-    h = load_history()
-    h = [e for e in h if (DOWNLOADS_DIR / e["filename"]).exists()]
-    return jsonify(h)
+    return jsonify(history_items())
+
+@app.route("/stats")
+def stats():
+    items = history_items()
+    total = sum(int(e.get("size") or 0) for e in items)
+    return jsonify({"count": len(items), "bytes": total})
+
+@app.route("/feed/<kind>")
+def feed(kind):
+    want = "mp4" if kind == "video" else "mp3"
+    items = [e for e in history_items() if (e.get("fmt") or "").lower() == want]
+    random.shuffle(items)
+    return jsonify(items)
 
 @app.route("/dl/<filename>")
 def dl(filename):
     return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=True)
+
+@app.route("/open/<filename>")
+def open_media(filename):
+    return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=False)
+
+@app.route("/thumb/<filename>")
+def thumb(filename):
+    safe = os.path.basename(filename)
+    path = DOWNLOADS_DIR / safe
+    if not path.exists():
+        return Response(music_note_svg(), mimetype="image/svg+xml")
+
+    ext = path.suffix.lower()
+    made = None
+    if ext == ".mp4":
+        made = make_video_thumb(path, safe)
+    elif ext == ".mp3":
+        made = make_audio_thumb(path, safe)
+
+    if made and made.exists():
+        return send_file(made)
+    return Response(music_note_svg(), mimetype="image/svg+xml")
 
 @app.route("/delete/<filename>", methods=["POST", "DELETE"])
 def delete(filename):
@@ -303,6 +421,10 @@ def delete(filename):
     path = DOWNLOADS_DIR / safe
     if path.exists():
         path.unlink()
+    for ext in (".jpg", ".png", ".webp"):
+        cached = thumb_name(safe, ext)
+        if cached.exists():
+            cached.unlink()
     # Remove from history
     with history_lock:
         h = load_history()
