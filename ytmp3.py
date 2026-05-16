@@ -18,6 +18,7 @@ Made by AzizBgBoss
 import os, re, threading, time, json, shutil, subprocess, random, hashlib
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, send_file, Response
+from auth import init_auth, login_required, login_route, logout_route, set_login_theme
 
 # ── Config ─────────────────────────────────────────────────────────────────
 PORT         = 5555
@@ -66,6 +67,8 @@ except ImportError:
 DOWNLOADS_DIR.mkdir(exist_ok=True)
 THUMBS_DIR.mkdir(exist_ok=True)
 app = Flask(__name__, static_folder=".", static_url_path="")
+init_auth(app, users_file='ytmp3_users.json', cookie_name='ytmp3_token')
+set_login_theme('ytmp3', 'YT', 'MP3', 'youtube downloader')
 
 # In-memory active jobs  { job_id: { status, title, progress, filename, error } }
 jobs = {}
@@ -432,10 +435,12 @@ def download_mp4(job_id, url):
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 @app.route("/")
+@login_required
 def index():
     return send_file("index.html")
 
 @app.route("/search", methods=["POST"])
+@login_required
 def search():
     q = (request.get_json(force=True) or {}).get("q", "").strip()
     if not q:
@@ -464,6 +469,7 @@ def search():
         return jsonify({"error": str(e)}), 500
 
 @app.route("/start", methods=["POST"])
+@login_required
 def start():
     body = request.get_json(force=True) or {}
     url  = body.get("url", "").strip()
@@ -478,6 +484,7 @@ def start():
     return jsonify({"job_id": job_id})
 
 @app.route("/status/<job_id>")
+@login_required
 def status(job_id):
     job = jobs.get(job_id)
     if not job:
@@ -489,16 +496,19 @@ def all_jobs():
     return jsonify(jobs)
 
 @app.route("/history")
+@login_required
 def history():
     return jsonify(history_items())
 
 @app.route("/stats")
+@login_required
 def stats():
     items = history_items()
     total = sum(int(e.get("size") or 0) for e in items)
     return jsonify({"count": len(items), "bytes": total})
 
 @app.route("/feed/<kind>")
+@login_required
 def feed(kind):
     want = "mp4" if kind == "video" else "mp3"
     items = [e for e in history_items() if (e.get("fmt") or "").lower() == want]
@@ -506,10 +516,12 @@ def feed(kind):
     return jsonify(items)
 
 @app.route("/subscriptions")
+@login_required
 def subscriptions():
     return jsonify(load_subscriptions())
 
 @app.route("/subscribe", methods=["POST"])
+@login_required
 def subscribe():
     body = request.get_json(force=True) or {}
     channel = (body.get("channel") or "").strip()
@@ -537,6 +549,7 @@ def subscribe():
     return jsonify({"ok": True, "subscriptions": items})
 
 @app.route("/unsubscribe", methods=["POST", "DELETE"])
+@login_required
 def unsubscribe():
     body = request.get_json(force=True) or {}
     channel = (body.get("channel") or "").strip().lower()
@@ -547,6 +560,7 @@ def unsubscribe():
     return jsonify({"ok": True, "subscriptions": items})
 
 @app.route("/suggestions")
+@login_required
 def suggestions():
     items = history_items()
     subs = subscription_names()
@@ -589,14 +603,17 @@ def suggestions():
         return jsonify({"error": str(e), "seeds": seeds, "subscriptions": load_subscriptions(), "results": []}), 500
 
 @app.route("/dl/<filename>")
+@login_required
 def dl(filename):
     return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=True)
 
 @app.route("/open/<filename>")
+@login_required
 def open_media(filename):
     return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=False)
 
 @app.route("/thumb/<filename>")
+@login_required
 def thumb(filename):
     safe = os.path.basename(filename)
     path = DOWNLOADS_DIR / safe
