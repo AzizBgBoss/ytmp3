@@ -23,6 +23,7 @@ from flask import Flask, request, jsonify, send_from_directory, send_file, Respo
 PORT         = 5555
 DOWNLOADS_DIR = Path("downloads")
 HISTORY_FILE  = Path("downloads_history.json")
+SUBSCRIPTIONS_FILE = Path("subscriptions.json")
 THUMBS_DIR    = Path("thumbs")
 
 # Set to your ffmpeg.exe if not in PATH, e.g. r"C:\ffmpeg\bin\ffmpeg.exe"
@@ -30,6 +31,8 @@ FFMPEG_PATH  = None
 
 # Number of search results to return (yt-dlp uses the `ytsearchN:` syntax)
 SEARCH_RESULTS = 20
+SUGGESTION_SEEDS = 10
+SUGGESTIONS_PER_SEED = 5
 
 # ── Auto-detect ffmpeg on Windows ──────────────────────────────────────────
 def find_ffmpeg():
@@ -69,6 +72,7 @@ jobs = {}
 
 # ── Persistent history ──────────────────────────────────────────────────────
 history_lock = threading.Lock()
+subscriptions_lock = threading.Lock()
 
 def load_history():
     if HISTORY_FILE.exists():
@@ -86,9 +90,35 @@ def save_entry(entry):
         h.insert(0, entry)
         HISTORY_FILE.write_text(json.dumps(h, ensure_ascii=False, indent=2), "utf-8")
 
+def load_subscriptions():
+    if SUBSCRIPTIONS_FILE.exists():
+        try:
+            data = json.loads(SUBSCRIPTIONS_FILE.read_text("utf-8"))
+            if isinstance(data, list):
+                return [x for x in data if isinstance(x, dict)]
+        except Exception:
+            pass
+    return []
+
+def save_subscriptions(items):
+    with subscriptions_lock:
+        SUBSCRIPTIONS_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), "utf-8")
+
 # ── Helpers ─────────────────────────────────────────────────────────────────
 def sanitize(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name)
+
+def video_id_from_url(url):
+    if not url:
+        return ""
+    m = re.search(r"(?:v=|youtu\.be/|/shorts/)([A-Za-z0-9_-]{6,})", url)
+    return m.group(1) if m else ""
+
+def normalize_video_url(url, vid=""):
+    if url and url.startswith(("http://", "https://")):
+        return url
+    vid = vid or url or ""
+    return f"https://www.youtube.com/watch?v={vid}" if vid else ""
 
 def fmt_duration(secs):
     if not secs: return "?"
@@ -177,12 +207,83 @@ def history_items():
         if path.exists():
             item = dict(e)
             item["filename"] = filename
+            item["channel"] = item.get("channel") or ""
+            item["video_id"] = item.get("video_id") or video_id_from_url(item.get("source_url") or "")
+            item["source_url"] = item.get("source_url") or ""
             item["size"] = path.stat().st_size
             item["open_url"] = file_url(filename, "open")
             item["download_url"] = file_url(filename, "dl")
             item["thumb"] = file_url(filename, "thumb")
             items.append(item)
     return items
+
+STOP_WORDS = set("""
+official video audio lyrics lyric hd hq 4k full album live remix remastered
+version clip music video visualizer feat ft featuring prod extended original
+the a an and or of to in on for with from by vs
+""".split())
+
+def suggestion_terms(title):
+    text = re.sub(r"\([^)]*\)|\[[^]]*\]", " ", title or "")
+    text = re.sub(r"[_\-|:/]+", " ", text)
+    words = re.findall(r"[A-Za-z0-9']{3,}", text.lower())
+    picked = []
+    for w in words:
+        if w in STOP_WORDS or w in picked:
+            continue
+        picked.append(w)
+    return picked[:5]
+
+def subscription_names():
+    names = []
+    for sub in load_subscriptions():
+        name = (sub.get("channel") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+def subscription_key_map():
+    keys = {}
+    for name in subscription_names():
+        keys[name.lower()] = True
+    return keys
+
+def suggestion_seeds(items, subs=None):
+    seeds = []
+    for name in (subs or []):
+        if name and name not in seeds:
+            seeds.append(name)
+        if len(seeds) >= SUGGESTION_SEEDS:
+            return seeds
+    for item in items:
+        title = item.get("title") or item.get("filename") or ""
+        terms = suggestion_terms(title)
+        if len(terms) >= 2:
+            seed = " ".join(terms[:3])
+        elif terms:
+            seed = terms[0]
+        else:
+            continue
+        if seed not in seeds:
+            seeds.append(seed)
+        if len(seeds) >= SUGGESTION_SEEDS:
+            break
+    return seeds
+
+def downloaded_keys(items):
+    keys = {"titles": {}, "ids": {}, "urls": {}}
+    for item in items:
+        title = (item.get("title") or item.get("filename") or "").lower()
+        key = re.sub(r"[^a-z0-9]+", "", title)
+        if key:
+            keys["titles"][key] = True
+        vid = item.get("video_id") or video_id_from_url(item.get("source_url") or "")
+        if vid:
+            keys["ids"][vid] = True
+        url = item.get("source_url") or ""
+        if url:
+            keys["urls"][url] = True
+    return keys
 
 # ── Download workers ─────────────────────────────────────────────────────────
 def make_hook(job):
@@ -227,6 +328,9 @@ def download_mp3(job_id, url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info  = ydl.extract_info(url, download=False)
             title = info.get("title", "unknown")
+            channel = info.get("channel") or info.get("uploader") or ""
+            video_id = info.get("id") or video_id_from_url(url)
+            source_url = info.get("webpage_url") or normalize_video_url(url, video_id)
             job["title"]  = title
             job["status"] = "starting"
             ydl.download([url])
@@ -242,6 +346,7 @@ def download_mp3(job_id, url):
             job["status"]   = "done"
             job["progress"] = "100%"
             save_entry({"filename": out.name, "title": title, "fmt": "mp3",
+                        "channel": channel, "video_id": video_id, "source_url": source_url,
                         "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
         else:
             raise FileNotFoundError("MP3 not found after conversion")
@@ -269,6 +374,9 @@ def download_mp4(job_id, url):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info  = ydl.extract_info(url, download=False)
             title = info.get("title", "unknown")
+            channel = info.get("channel") or info.get("uploader") or ""
+            video_id = info.get("id") or video_id_from_url(url)
+            source_url = info.get("webpage_url") or normalize_video_url(url, video_id)
             job["title"]  = title
             job["status"] = "starting"
             ydl.download([url])
@@ -312,6 +420,7 @@ def download_mp4(job_id, url):
         job["filename"] = out.name
         job["status"]   = "done"
         save_entry({"filename": out.name, "title": title, "fmt": "mp4",
+                    "channel": channel, "video_id": video_id, "source_url": source_url,
                     "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
 
     except Exception as e:
@@ -334,12 +443,17 @@ def search():
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(f"ytsearch{SEARCH_RESULTS}:{q}", download=False)
         results = []
+        subbed = subscription_key_map()
         for e in (info.get("entries") or []):
             vid = e.get("id", "")
+            url = normalize_video_url(e.get("url") or "", vid)
+            channel = e.get("channel") or e.get("uploader") or ""
             results.append({
                 "title":    e.get("title", "Unknown"),
-                "url":      e.get("url") or f"https://www.youtube.com/watch?v={vid}",
-                "channel":  e.get("channel") or e.get("uploader") or "?",
+                "url":      url,
+                "video_id": vid,
+                "channel":  channel,
+                "subscribed": bool(channel and subbed.get(channel.lower())),
                 "duration": fmt_duration(e.get("duration")),
                 "thumb":    f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else "",
             })
@@ -389,6 +503,89 @@ def feed(kind):
     random.shuffle(items)
     return jsonify(items)
 
+@app.route("/subscriptions")
+def subscriptions():
+    return jsonify(load_subscriptions())
+
+@app.route("/subscribe", methods=["POST"])
+def subscribe():
+    body = request.get_json(force=True) or {}
+    channel = (body.get("channel") or "").strip()
+    channel_url = (body.get("channel_url") or "").strip()
+    if not channel:
+        return jsonify({"error": "empty channel"}), 400
+    with subscriptions_lock:
+        items = load_subscriptions()
+        lowered = channel.lower()
+        exists = False
+        for item in items:
+            if (item.get("channel") or "").lower() == lowered:
+                item["channel"] = channel
+                if channel_url:
+                    item["channel_url"] = channel_url
+                exists = True
+                break
+        if not exists:
+            items.insert(0, {
+                "channel": channel,
+                "channel_url": channel_url,
+                "date": time.strftime("%Y-%m-%d %H:%M"),
+            })
+        SUBSCRIPTIONS_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), "utf-8")
+    return jsonify({"ok": True, "subscriptions": items})
+
+@app.route("/unsubscribe", methods=["POST", "DELETE"])
+def unsubscribe():
+    body = request.get_json(force=True) or {}
+    channel = (body.get("channel") or "").strip().lower()
+    with subscriptions_lock:
+        items = load_subscriptions()
+        items = [x for x in items if (x.get("channel") or "").lower() != channel]
+        SUBSCRIPTIONS_FILE.write_text(json.dumps(items, ensure_ascii=False, indent=2), "utf-8")
+    return jsonify({"ok": True, "subscriptions": items})
+
+@app.route("/suggestions")
+def suggestions():
+    items = history_items()
+    subs = subscription_names()
+    seeds = suggestion_seeds(items, subs)
+    if not seeds:
+        return jsonify({"seeds": [], "subscriptions": load_subscriptions(), "results": []})
+
+    seen_urls = {}
+    downloaded = downloaded_keys(items)
+    subbed = subscription_key_map()
+    results = []
+    try:
+        opts = {"quiet": True, "no_warnings": True, "extract_flat": True, "skip_download": True}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            for seed in seeds:
+                info = ydl.extract_info(f"ytsearch{SUGGESTIONS_PER_SEED}:{seed}", download=False)
+                for e in (info.get("entries") or []):
+                    vid = e.get("id", "")
+                    url = normalize_video_url(e.get("url") or "", vid)
+                    title = e.get("title", "Unknown")
+                    title_key = re.sub(r"[^a-z0-9]+", "", title.lower())
+                    if (not url or seen_urls.get(url) or downloaded["urls"].get(url) or
+                            downloaded["ids"].get(vid) or downloaded["titles"].get(title_key)):
+                        continue
+                    seen_urls[url] = True
+                    channel = e.get("channel") or e.get("uploader") or ""
+                    results.append({
+                        "title": title,
+                        "url": url,
+                        "video_id": vid,
+                        "channel": channel,
+                        "subscribed": bool(channel and subbed.get(channel.lower())),
+                        "duration": fmt_duration(e.get("duration")),
+                        "thumb": f"https://i.ytimg.com/vi/{vid}/mqdefault.jpg" if vid else "",
+                        "seed": seed,
+                    })
+        random.shuffle(results)
+        return jsonify({"seeds": seeds, "subscriptions": load_subscriptions(), "results": results[:18]})
+    except Exception as e:
+        return jsonify({"error": str(e), "seeds": seeds, "subscriptions": load_subscriptions(), "results": []}), 500
+
 @app.route("/dl/<filename>")
 def dl(filename):
     return send_from_directory(DOWNLOADS_DIR.resolve(), os.path.basename(filename), as_attachment=True)
@@ -435,6 +632,11 @@ def delete(filename):
 
 if __name__ == "__main__":
     import socket
+    try:
+        import sys
+        sys.stdout.reconfigure(errors="replace")
+    except Exception:
+        pass
     try:
         lan_ip = socket.gethostbyname(socket.gethostname())
     except:

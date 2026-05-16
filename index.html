@@ -167,6 +167,7 @@ input[type=text]:focus { border-color: #00ff88; }
 .rtitle { font-size: 13px; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; margin-bottom: 2px; }
 .rmeta  { font-size: 11px; color: #4a5a4a; }
 .rget   { font-size: 11px; color: #00ff88; border: 1px solid #1a1a2e; padding: 4px 8px; margin-left: 8px; -webkit-flex-shrink: 0; flex-shrink: 0; }
+.rsub   { background: transparent; color: #ffe066; border: 1px solid #1a1a2e; font-family: monospace; font-size: 11px; padding: 4px 7px; margin-left: 6px; cursor: pointer; -webkit-flex-shrink: 0; flex-shrink: 0; }
 .serr   { color: #ff6b35; font-size: 12px; padding: 10px 0; }
 
 /* Section headers */
@@ -250,6 +251,50 @@ input[type=text]:focus { border-color: #00ff88; }
   font-size: 0;
   text-align: left;
 }
+#suggestlist {
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: left;
+}
+#suggestseeds {
+  max-width: 560px;
+  margin: 0 auto 10px;
+  color: #4a5a4a;
+  font-size: 11px;
+  text-align: left;
+  line-height: 1.5;
+}
+#subslist {
+  max-width: 560px;
+  margin: 0 auto 10px;
+  text-align: left;
+  color: #4a5a4a;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.seedtag {
+  display: inline-block;
+  border: 1px solid #1a1a2e;
+  color: #ffe066;
+  padding: 2px 5px;
+  margin: 0 4px 4px 0;
+}
+.subtag {
+  display: inline-block;
+  border: 1px solid #1a1a2e;
+  color: #00ff88;
+  padding: 2px 5px;
+  margin: 0 4px 4px 0;
+}
+.unsub {
+  background: transparent;
+  border: none;
+  color: #ff6b35;
+  font-family: monospace;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 0 0 5px;
+}
 #feedlist .empty {
   width: 100%;
   font-size: 12px;
@@ -282,6 +327,7 @@ input[type=text]:focus { border-color: #00ff88; }
 @media (min-width: 620px) {
   #feedlist { max-width: 760px; }
   #feedview .shdrline { max-width: 760px; }
+  #suggestlist, #suggestview .shdrline, #suggestseeds, #subslist { max-width: 760px; }
   .feeditem { width: 33.333%; }
   .fthumb { height: 102px; }
 }
@@ -306,6 +352,7 @@ input[type=text]:focus { border-color: #00ff88; }
   <h1>yt<span>mp3</span></h1>
   <div class="nav">
     <button class="navbtn on" id="navhome" onclick="showView('home')">Home</button>
+    <button class="navbtn" id="navsuggest" onclick="showView('suggest')">Suggestions</button>
     <button class="navbtn" id="navvideo" onclick="showView('video')">Video Feed</button>
     <button class="navbtn" id="navmusic" onclick="showView('music')">Music Feed</button>
   </div>
@@ -362,6 +409,13 @@ input[type=text]:focus { border-color: #00ff88; }
   <div id="feedlist"><div class="empty">loading...</div></div>
 </div>
 
+<div id="suggestview" class="view off">
+  <div class="shdrline"><div class="shdr">suggestions</div><div class="storage"><button class="navbtn" onclick="loadSuggestions()">Refresh</button></div></div>
+  <div id="subslist"></div>
+  <div id="suggestseeds"></div>
+  <div id="suggestlist"><div class="empty">loading...</div></div>
+</div>
+
 <script>
 /* ES3-safe JS: var only, for loops, XMLHttpRequest, no arrow functions */
 
@@ -394,14 +448,19 @@ var currentFeed = 'video';
 function showView(id) {
   var home = document.getElementById('homeview');
   var feed = document.getElementById('feedview');
+  var suggest = document.getElementById('suggestview');
   document.getElementById('navhome').className  = 'navbtn' + (id === 'home' ? ' on' : '');
+  document.getElementById('navsuggest').className = 'navbtn' + (id === 'suggest' ? ' on' : '');
   document.getElementById('navvideo').className = 'navbtn' + (id === 'video' ? ' on' : '');
   document.getElementById('navmusic').className = 'navbtn' + (id === 'music' ? ' on' : '');
   home.className = 'view' + (id === 'home' ? '' : ' off');
-  feed.className = 'view' + (id === 'home' ? ' off' : '');
+  feed.className = 'view' + (id === 'video' || id === 'music' ? '' : ' off');
+  suggest.className = 'view' + (id === 'suggest' ? '' : ' off');
   if (id === 'video' || id === 'music') {
     currentFeed = id;
     loadFeed(id);
+  } else if (id === 'suggest') {
+    loadSuggestions();
   } else {
     loadHistory();
   }
@@ -442,12 +501,14 @@ function doSearch() {
     var html = '', i, r;
     for (i = 0; i < d.results.length; i++) {
       r = d.results[i];
+      var sub = r.channel ? '<button class="rsub" data-channel="' + ea(r.channel.toLowerCase()) + '" onclick="return toggleSub(' + jsq(r.channel) + ', this)">' + (r.subscribed ? 'SUBD' : 'SUB') + '</button>' : '';
       html += '<div class="res" onclick="queue(' + jsq(r.url) + ')">' +
         '<img class="thumb" src="' + ea(r.thumb) + '" onerror="this.style.display=\'none\'">' +
         '<div class="rinfo">' +
           '<div class="rtitle">' + esc(r.title) + '</div>' +
-          '<div class="rmeta">' + esc(r.channel) + ' &middot; ' + esc(r.duration) + '</div>' +
+          '<div class="rmeta">' + esc(r.channel || '?') + ' &middot; ' + esc(r.duration) + '</div>' +
         '</div>' +
+        sub +
         '<span class="rget">GET</span>' +
         '</div>';
     }
@@ -586,7 +647,7 @@ function loadFeed(kind) {
         '<img class="fthumb" src="/thumb/' + encodeURIComponent(h.filename) + '" alt="">' +
         '<div class="finfo">' +
           '<div class="ftitle">' + esc(h.title || h.filename) + '</div>' +
-          '<div class="fmeta">[' + esc(h.fmt || '?') + '] ' + (mb ? mb + ' ' : '') + esc(h.date || '') + '</div>' +
+          '<div class="fmeta">' + esc(h.channel || '') + (h.channel ? '<br>' : '') + '[' + esc(h.fmt || '?') + '] ' + (mb ? mb + ' ' : '') + esc(h.date || '') + '</div>' +
           '<div class="factions">' +
             '<a class="fopen" href="/open/' + encodeURIComponent(h.filename) + '">OPEN</a>' +
             '<a class="fdl" href="/dl/' + encodeURIComponent(h.filename) + '" download>DL</a>' +
@@ -596,6 +657,103 @@ function loadFeed(kind) {
     }
     el.innerHTML = html;
   });
+}
+
+function loadSuggestions() {
+  document.getElementById('subslist').innerHTML = '';
+  document.getElementById('suggestseeds').innerHTML = '';
+  document.getElementById('suggestlist').innerHTML = '<div class="empty">loading...</div>';
+  xhr('GET', '/suggestions', null, function(s, d) {
+    var list = document.getElementById('suggestlist');
+    var seeds = document.getElementById('suggestseeds');
+    var subs = document.getElementById('subslist');
+    if (!d || d.error) {
+      list.innerHTML = '<div class="serr">' + esc(d ? d.error : 'error') + '</div>';
+      return;
+    }
+    renderSubs(d.subscriptions || []);
+    if (d.seeds && d.seeds.length) {
+      var seedHtml = 'based on ';
+      var i;
+      for (i = 0; i < d.seeds.length; i++) {
+        seedHtml += '<span class="seedtag">' + esc(d.seeds[i]) + '</span>';
+      }
+      seeds.innerHTML = seedHtml;
+    }
+    if (!d.results || !d.results.length) {
+      list.innerHTML = '<div class="empty">download a few songs or videos first</div>';
+      return;
+    }
+    var html = '', r;
+    for (i = 0; i < d.results.length; i++) {
+      r = d.results[i];
+      var sub = r.channel ? '<button class="rsub" data-channel="' + ea(r.channel.toLowerCase()) + '" onclick="return toggleSub(' + jsq(r.channel) + ', this)">' + (r.subscribed ? 'SUBD' : 'SUB') + '</button>' : '';
+      html += '<div class="res" onclick="queue(' + jsq(r.url) + ')">' +
+        '<img class="thumb" src="' + ea(r.thumb) + '" onerror="this.style.display=\'none\'">' +
+        '<div class="rinfo">' +
+          '<div class="rtitle">' + esc(r.title) + '</div>' +
+          '<div class="rmeta">' + esc(r.channel) + ' &middot; ' + esc(r.duration) + ' &middot; like ' + esc(r.seed) + '</div>' +
+        '</div>' +
+        sub +
+        '<span class="rget">GET</span>' +
+        '</div>';
+    }
+    list.innerHTML = html;
+  });
+}
+
+function renderSubs(items) {
+  var el = document.getElementById('subslist');
+  if (!el) { return; }
+  if (!items || !items.length) {
+    el.innerHTML = 'no subscriptions yet';
+    return;
+  }
+  var html = 'subscriptions ';
+  var i, s, name;
+  for (i = 0; i < items.length; i++) {
+    s = items[i];
+    name = s.channel || '';
+    if (!name) { continue; }
+    html += '<span class="subtag">' + esc(name) + '<button class="unsub" onclick="return unsubChannel(' + jsq(name) + ')">x</button></span>';
+  }
+  el.innerHTML = html;
+}
+
+function setSubButtons(channel, isSubbed) {
+  var key = String(channel || '').toLowerCase();
+  var btns = document.querySelectorAll('.rsub');
+  var i;
+  for (i = 0; i < btns.length; i++) {
+    if (btns[i].getAttribute('data-channel') === key) {
+      btns[i].innerHTML = isSubbed ? 'SUBD' : 'SUB';
+    }
+  }
+}
+
+function toggleSub(channel, btn) {
+  if (window.event) { window.event.cancelBubble = true; }
+  if (!channel) { return false; }
+  var isSubbed = btn && btn.innerHTML === 'SUBD';
+  var url = isSubbed ? '/unsubscribe' : '/subscribe';
+  xhr('POST', url, {channel: channel}, function(s, d) {
+    if (s >= 200 && s < 300) {
+      setSubButtons(channel, !isSubbed);
+    } else if (btn) {
+      btn.innerHTML = 'ERR';
+    }
+    if (d && d.subscriptions) { renderSubs(d.subscriptions); }
+  });
+  return false;
+}
+
+function unsubChannel(channel) {
+  if (window.event) { window.event.cancelBubble = true; }
+  xhr('POST', '/unsubscribe', {channel: channel}, function(s, d) {
+    if (d && d.subscriptions) { renderSubs(d.subscriptions); }
+    loadSuggestions();
+  });
+  return false;
 }
 
 var pendingDelete = '';
