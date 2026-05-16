@@ -250,7 +250,9 @@ def subscription_key_map():
 
 def suggestion_seeds(items, subs=None):
     seeds = []
-    for name in (subs or []):
+    sub_pool = list(subs or [])
+    random.shuffle(sub_pool)
+    for name in sub_pool:
         if name and name not in seeds:
             seeds.append(name)
         if len(seeds) >= SUGGESTION_SEEDS:
