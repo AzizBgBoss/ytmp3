@@ -648,6 +648,8 @@ def delete(filename):
         HISTORY_FILE.write_text(json.dumps(h, ensure_ascii=False, indent=2), "utf-8")
     return jsonify({"ok": True})
 
+app.add_url_rule('/login',  'login',  login_route,  methods=['GET', 'POST'])
+app.add_url_rule('/logout', 'logout', logout_route, methods=['GET', 'POST'])
 
 if __name__ == "__main__":
     import socket
