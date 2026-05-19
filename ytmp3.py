@@ -19,6 +19,7 @@ import os, re, threading, time, json, shutil, subprocess, random, hashlib
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, send_file, Response
 from auth import init_auth, login_required, login_route, logout_route, set_login_theme
+import requests
 
 # ── Config ─────────────────────────────────────────────────────────────────
 PORT         = 5555
@@ -34,6 +35,9 @@ FFMPEG_PATH  = None
 SEARCH_RESULTS = 20
 SUGGESTION_SEEDS = 10
 SUGGESTIONS_PER_SEED = 5
+
+def notify(message):
+    requests.post("http://0.0.0.0:6767/api/notify",json={"name": "YTMP3","content": message},timeout=5)
 
 # ── Auto-detect ffmpeg on Windows ──────────────────────────────────────────
 def find_ffmpeg():
@@ -353,12 +357,14 @@ def download_mp3(job_id, url):
             save_entry({"filename": out.name, "title": title, "fmt": "mp3",
                         "channel": channel, "video_id": video_id, "source_url": source_url,
                         "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
+            notify(f"MP3 downloaded: {title}")
         else:
             raise FileNotFoundError("MP3 not found after conversion")
 
     except Exception as e:
         job["status"] = "error"
         job["error"]  = str(e)
+        notify(f"Error downloading MP3 {title}: {str(e)}")
 
 def download_mp4(job_id, url):
     job = jobs[job_id]
@@ -424,6 +430,7 @@ def download_mp4(job_id, url):
 
         job["filename"] = out.name
         job["status"]   = "done"
+        notify(f"MP4 downloaded: {title}")
         save_entry({"filename": out.name, "title": title, "fmt": "mp4",
                     "channel": channel, "video_id": video_id, "source_url": source_url,
                     "date": time.strftime("%Y-%m-%d %H:%M"), "size": out.stat().st_size})
@@ -431,6 +438,7 @@ def download_mp4(job_id, url):
     except Exception as e:
         job["status"] = "error"
         job["error"]  = str(e)
+        notify(f"Error downloading MP4 {title}: {str(e)}")
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
